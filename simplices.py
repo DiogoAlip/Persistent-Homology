@@ -475,3 +475,5 @@ def get_essential_indices_coh(cocycles, birth):
         if not marked(cocycles[i]):
             essential_indices.append(birth[i])
     return essential_indices
+
+#35 -> 62 page
