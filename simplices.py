@@ -422,3 +422,56 @@ def get_chain(cocycle):
     return cocycle[1]
 
 #33 -> 61
+
+def simplex_indices_with_this_coboundary (possible_coboundary, simplices_list):
+    boundary_indices = []
+    for j in range(len(simplices_list)):
+        if is_coboundary(possible_coboundary, simplices_list[j]):
+            boundary_indices.append(j)
+    return boundary_indices
+
+def is_coboundary_of_the_chain(possible_coboundary, simplices_cochain):
+    indices = simplex_indices_with_this_coboundary(possible_coboundary,
+    → simplices_cochain)
+    return len(indices) % 2 != 0
+
+def cocycles_indices_with_this_coboundary(possible_coboundary, cocycles):
+    cocycles_indices = []
+    for j in range(len(cocycles)):
+        if unmarked(cocycles[j]) and
+            → is_coboundary_of_the_chain(possible_coboundary, get_chain(cocycles[j])):
+            cocycles_indices.append(j)
+    return cocycles_indices
+
+def pCoh_Z2(simplexwise_filtration):
+    number_of_simplices = len(simplexwise_filtration)
+    
+    persistence_pairs=[]
+    cocycles = []
+    birth = []
+    
+    for i in range(number_of_simplices):
+        new_simplex = simplexwise_filtration[i]
+→
+        former_cocycles_indices = cocycles_indices_with_this_coboundary(new_simplex, cocycles)
+
+        if len(former_cocycles_indices) == 0:
+            cocycles.insert(0,[0,[new_simplex]])
+            birth.insert(0,i)
+        else:
+            p = former_cocycles_indices[0]
+            for former_cocycle_index in former_cocycles_indices[1:]:
+                cocycles[former_cocycle_index][1] =
+                    → cocycles[former_cocycle_index][1] + cocycles[p][1]
+            cocycles[p] = mark(cocycles[p])
+            persistence_pairs.append([birth[p], i])
+            cocycles.insert(0,[1,[new_simplex]])
+            birth.insert(0,i)
+    return persistence_pairs, cocycles, birth
+
+def get_essential_indices_coh(cocycles, birth):
+    essential_indices = []
+    for i in range(len(cocycles)):
+        if not marked(cocycles[i]):
+            essential_indices.append(birth[i])
+    return essential_indices
