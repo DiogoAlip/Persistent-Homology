@@ -293,8 +293,7 @@ test()
 def plot_persistence_diagram_radious(simplexwise_filtration, distance_m, persistence_pairs, essential_indices):
     number_of_simplices = len(simplexwise_filtration)
     
-    diameters = [simplex_diameter(simplex, distance_m) for simplex in
-    → simplexwise_filtration]
+    diameters = [simplex_diameter(simplex, distance_m) for simplex in simplexwise_filtration]
     
     max_diameter = max(diameters)
     step = max_diameter/10
@@ -322,10 +321,8 @@ def plot_persistence_diagram_radious(simplexwise_filtration, distance_m, persist
 
     while point_index < len(points):
         for index in range(len(dimension_change_list)):
-            if essential_indices[point_index - number_of_pp] <
-            → dimension_change_list[index]:
-            points_by_dimension[index].
-                → append([points[point_index][0],points[point_index][1]+(step/10)])
+            if essential_indices[point_index - number_of_pp] < dimension_change_list[index]:
+                points_by_dimension[index].append([points[point_index][0],points[point_index][1]+(step/10)])
                 break
         point_index += 1
 
@@ -356,8 +353,7 @@ def plot_persistence_diagram_radious(simplexwise_filtration, distance_m, persist
 
 def traspose(matrix):
     if len(matrix) == 0: return []
-    return [[matrix[i][j] for i in range(len(matrix))] for j in
-    → range(len(matrix[0]))]
+    return [[matrix[i][j] for i in range(len(matrix))] for j in range(len(matrix[0]))]
 
 def reduce_column_if_necessary(R_t, V_t, i):
     actual_low = low(R_t[i])
@@ -431,15 +427,13 @@ def simplex_indices_with_this_coboundary (possible_coboundary, simplices_list):
     return boundary_indices
 
 def is_coboundary_of_the_chain(possible_coboundary, simplices_cochain):
-    indices = simplex_indices_with_this_coboundary(possible_coboundary,
-    → simplices_cochain)
+    indices = simplex_indices_with_this_coboundary(possible_coboundary, simplices_cochain)
     return len(indices) % 2 != 0
 
 def cocycles_indices_with_this_coboundary(possible_coboundary, cocycles):
     cocycles_indices = []
     for j in range(len(cocycles)):
-        if unmarked(cocycles[j]) and
-            → is_coboundary_of_the_chain(possible_coboundary, get_chain(cocycles[j])):
+        if unmarked(cocycles[j]) and is_coboundary_of_the_chain(possible_coboundary, get_chain(cocycles[j])):
             cocycles_indices.append(j)
     return cocycles_indices
 
@@ -452,7 +446,7 @@ def pCoh_Z2(simplexwise_filtration):
     
     for i in range(number_of_simplices):
         new_simplex = simplexwise_filtration[i]
-→
+
         former_cocycles_indices = cocycles_indices_with_this_coboundary(new_simplex, cocycles)
 
         if len(former_cocycles_indices) == 0:
@@ -461,8 +455,7 @@ def pCoh_Z2(simplexwise_filtration):
         else:
             p = former_cocycles_indices[0]
             for former_cocycle_index in former_cocycles_indices[1:]:
-                cocycles[former_cocycle_index][1] =
-                    → cocycles[former_cocycle_index][1] + cocycles[p][1]
+                cocycles[former_cocycle_index][1] = cocycles[former_cocycle_index][1] + cocycles[p][1]
             cocycles[p] = mark(cocycles[p])
             persistence_pairs.append([birth[p], i])
             cocycles.insert(0,[1,[new_simplex]])
@@ -477,3 +470,563 @@ def get_essential_indices_coh(cocycles, birth):
     return essential_indices
 
 #35 -> 62 page
+#pHcol con CLearing Column
+def first_column_with_this_pivot(R_t, pivot_index):
+    for j in range(len(R_t)):
+        if low(R_t[j]) == pivot_index:
+            return j
+    return -1
+
+def pHcol_Z2_cc(boundary_t):
+    number_of_columns = len(boundary_t)
+    R_t = copy.deepcopy(boundary_t)
+    V_t = create_V_matrix(number_of_columns)
+    persistence_pairs = []
+    essential_indices = []
+
+    for column_index in range(number_of_columns):
+        pivot = low(R_t[column_index])
+        reduced_column_index = first_column_with_this_pivot(R_t, pivot)
+        while (
+            pivot != -1 and
+            reduced_column_index != column_index
+        ):
+            R_t[column_index] = sum_cols_Z2(R_t[column_index],R_t[reduced_column_index])
+
+            V_t[column_index] = sum_cols_Z2(V_t[column_index],V_t[reduced_column_index])
+            
+            pivot = low(R_t[column_index])
+            reduced_column_index = first_column_with_this_pivot(R_t, pivot)
+
+        if pivot != -1:
+            persistence_pairs.append([pivot, column_index])
+        else:
+            essential_indices.append(column_index)
+    return V_t, R_t, persistence_pairs, essential_indices
+
+def remove_elements_with_indices (array, indices_to_remove):
+    new_array = []
+    for i in range(len(array)):
+        if i not in indices_to_remove:
+            new_array.append(array[i])
+    return new_array
+
+def fix_pp_column_indices(persistence_pairs, pivots):
+    fixed_pp = copy.deepcopy(persistence_pairs)
+    for pair in fixed_pp:
+        pivot_index = 0
+        while pivot_index < len(pivots) and pair[1] >= pivots[pivot_index]:
+            pivot_index += 1
+            pair[1] += 1
+    return fixed_pp
+
+def fix_ess_column_indices(essential_indices, pivots):
+    fixed_ess = copy.deepcopy(essential_indices)
+    for ess_i in range(len(fixed_ess)):
+        pivot_index = 0
+        while pivot_index < len(pivots) and fixed_ess[ess_i] >= pivots[pivot_index]:
+            pivot_index += 1
+            fixed_ess[ess_i] += 1
+    return fixed_ess
+
+def add_empty_row_in_indices(matrix, indices):
+    new_matrix = copy.deepcopy(matrix)
+    for i in indices:
+        new_matrix.insert(i,[0 for _ in new_matrix[0]])
+    return new_matrix
+
+def add_empty_col_in_indices(matrix, indices):
+    new_matrix = traspose(matrix)
+    for i in indices:
+        new_matrix.insert(i,[0 for _ in new_matrix[0]])
+    return traspose(new_matrix)
+
+def extend_R_filling_in_zeros(R_t, pivots):
+    pivots.sort()
+    return add_empty_row_in_indices(R_t, pivots)
+
+def extend_V_filling_in_zeros(V_t, pivots):
+    new_V_t = add_empty_row_in_indices(V_t, pivots)
+    new_V_t = add_empty_col_in_indices(new_V_t, pivots)
+    return new_V_t
+
+def clearing_columns (d_boundary_t, dp1_R_t, dp1_persistence_pairs):
+    my_d_boundary_t = copy.deepcopy(d_boundary_t)
+
+    pivots = lows(dp1_R_t)
+    d_boundary_t_cleared = remove_elements_with_indices (my_d_boundary_t, pivots)
+
+    d_V_t_cleared, d_R_t_cleared, d_persistence_pairs, d_essential_indices = pHcol_Z2_cc(d_boundary_t_cleared)
+    d_persistence_pairs = fix_pp_column_indices(d_persistence_pairs, pivots)
+    d_essential_indices = fix_ess_column_indices(d_essential_indices, pivots)
+    d_R_t = extend_R_filling_in_zeros(d_R_t_cleared, pivots)
+
+    if len(d_boundary_t[0]) != 0:
+        d_V_t = extend_V_filling_in_zeros(d_V_t_cleared, pivots)
+
+        for pair in dp1_persistence_pairs:
+            d_V_t[pair[0]] = dp1_R_t[pair[1]]
+
+        else:
+            d_V_t = create_V_matrix(len(d_boundary_t))
+    return d_V_t, d_R_t, d_persistence_pairs, d_essential_indices
+
+def get_row_and_column_indices(filtration_by_dimension, columns_dimension):
+    start_column_index = 0
+    start_row_index = 0
+    
+    for d in range(columns_dimension-1):
+        start_row_index += len(filtration_by_dimension[d])
+    
+    if columns_dimension != 0:
+        start_column_index = start_row_index + len(filtration_by_dimension[columns_dimension-1])
+
+    return start_row_index, start_column_index
+
+def fix_pp (persistence_pairs, start_row_index, start_column_index):
+    return [[pair[0]+start_row_index, pair[1]+start_column_index] for pair in persistence_pairs]
+
+def fix_ess (essential_indices, start_column_index):
+    return [essential_index+start_column_index for essential_index in essential_indices]
+
+def pHcol_clearing_columns(simplicial_complex):
+    simplexwise_filtration = copy.deepcopy(simplicial_complex[1])
+    
+    filtration_by_dimension = divide_by_dimension(simplexwise_filtration)
+    
+    total_simplices = len(simplexwise_filtration)
+    number_of_dimensions = len(filtration_by_dimension)
+    number_of_vertices = len(get_vertices(simplicial_complex))
+
+    persistence_pairs = []
+    essential_indices = []
+
+    dp1_R_t = []
+    dp1_pp = []
+
+    for columns_dimension in range(number_of_dimensions-1, -1, -1):
+        if columns_dimension == 0: rows = []
+
+        else: rows = filtration_by_dimension[columns_dimension-1]
+        columns = filtration_by_dimension[columns_dimension]
+        d_boundary_t = get_boundary_matrix_t(rows, columns)
+        d_V_t, d_R_t, d_pp, d_ess = clearing_columns(d_boundary_t, dp1_R_t, dp1_pp)
+
+        start_row_index, start_column_index = get_row_and_column_indices(filtration_by_dimension, columns_dimension)
+        persistence_pairs.extend(fix_pp(d_pp, start_row_index, start_column_index))
+
+        essential_indices.extend(
+            fix_ess (d_ess, start_column_index)
+        )
+
+        dp1_R_t = d_R_t
+        dp1_pp = d_pp
+    
+    return persistence_pairs, essential_indices
+
+
+#Intermedio Ripser
+
+def first_column_with_this_pivot(R_t, pivot_index):
+    for j in range(len(R_t)):
+        if low(R_t[j]) == pivot_index:
+            return j
+    return -1
+
+def pHcol_Z2_cc_cob(coboundary_t):
+    number_of_columns = len(coboundary_t)
+
+    R_t = copy.deepcopy(coboundary_t)
+    V_t = create_V_matrix(number_of_columns)
+    persistence_pairs = []
+    birth_non_essential = []
+    essential_indices = []
+
+    for column_index in range(number_of_columns):
+        pivot = low(R_t[column_index])
+        while (
+            pivot in birth_non_essential
+        ):
+            reduced_column_index = persistence_pairs[birth_non_essential.index(pivot)][1]
+            R_t[column_index] = sum_cols_Z2(R_t[column_index],R_t[reduced_column_index])
+            V_t[column_index] = sum_cols_Z2(V_t[column_index],V_t[reduced_column_index])
+
+            pivot = low(R_t[column_index])
+
+        if pivot != -1:
+            persistence_pairs.append([pivot, column_index])
+            birth_non_essential.append(pivot)
+        else:
+            essential_indices.append(column_index)
+
+    return V_t, R_t, persistence_pairs, essential_indices
+
+def clearing_columns_cob (d_boundary_t, dp1_R_t, dp1_persistence_pairs):
+    my_d_boundary_t = copy.deepcopy(d_boundary_t)
+    pivots = lows(dp1_R_t)
+    d_boundary_t_cleared = remove_elements_with_indices (my_d_boundary_t, pivots)
+    d_V_t_cleared, d_R_t_cleared, d_persistence_pairs, d_essential_indices = pHcol_Z2_cc_cob(d_boundary_t_cleared)
+
+    d_persistence_pairs = fix_pp_column_indices(d_persistence_pairs, pivots)
+    d_essential_indices = fix_ess_column_indices(d_essential_indices, pivots)
+    d_R_t = extend_R_filling_in_zeros(d_R_t_cleared, pivots)
+
+    if len(d_boundary_t[0]) != 0:
+        d_V_t = extend_V_filling_in_zeros(d_V_t_cleared, pivots)
+        for pair in dp1_persistence_pairs:
+            d_V_t[pair[0]] = dp1_R_t[pair[1]]
+    
+    else:
+        d_V_t = create_V_matrix(len(d_boundary_t))
+    
+    return d_V_t, d_R_t, d_persistence_pairs, d_essential_indices
+
+def pHcol_clearing_columns_coboundary(simplicial_complex):
+    simplexwise_filtration = copy.deepcopy(simplicial_complex[1])
+    
+    filtration_by_dimension = divide_by_dimension(simplexwise_filtration)
+    
+    total_simplices = len(simplexwise_filtration)
+    number_of_dimensions = len(filtration_by_dimension)
+    number_of_vertices = len(get_vertices(simplicial_complex))
+
+    persistence_pairs = []
+    essential_indices = []
+
+    dp1_R_t = []
+    dp1_pp = []
+
+    for rows_dimension in range(1, number_of_dimensions):
+        rows = copy.deepcopy(filtration_by_dimension[rows_dimension])
+        number_of_rows = len(rows)
+        
+        columns = copy.deepcopy(filtration_by_dimension[rows_dimension-1])
+        number_of_columns = len(columns)
+
+        # Para la correcta computación de la coboundary
+        rows.reverse()
+        columns.reverse()
+        d_coboundary_t = get_coboundary_matrix_t(rows, columns)
+        d_V_t, d_R_t, d_pp, d_ess = clearing_columns_cob(d_coboundary_t, dp1_R_t, dp1_pp)
+
+        d_persistence_pairs_cob = reverse_pairs_indices(number_of_rows -1, number_of_columns -1 , d_pp)
+
+        d_essential_indices_cob = reverse_essential_indices(number_of_columns -1, d_ess)
+
+        start_column_index, start_row_index = get_row_and_column_indices(filtration_by_dimension, rows_dimension)
+
+        # Los pares de persistencia tienen que darse la vuelta
+        d_persistence_pairs_cob = fix_pp(d_persistence_pairs_cob, start_row_index, start_column_index)
+        d_persistence_pairs = reverse_each_pair(d_persistence_pairs_cob)
+
+        persistence_pairs.extend(
+            d_persistence_pairs
+        )
+
+        essential_indices.extend(
+            fix_ess (d_essential_indices_cob, start_column_index)
+        )
+
+        dp1_R_t = d_R_t
+        dp1_pp = d_pp
+    
+    # Rellenar los essential_indices que son todos los de mayor dimensión excepto los death
+    birth_non_essential = [pair[1] for pair in d_persistence_pairs]
+    for i in range(len(filtration_by_dimension[-1])):
+        simplex_index = i + start_row_index
+        if simplex_index not in birth_non_essential: essential_indices.append(simplex_index)
+    return persistence_pairs, essential_indices
+
+def reverse_pairs_indices (row_max_index, column_max_index, persistence_pairs):
+    pp = []
+    for pair in persistence_pairs:
+        pair_reversed = [row_max_index - pair[0], column_max_index - pair[1]]
+        pp.append(pair_reversed)
+    return pp
+
+def reverse_essential_indices (column_max_index, essential_indices):
+    ess = []
+    for essential_index in essential_indices:
+        index_reversed = column_max_index - essential_index
+        ess.append(index_reversed)
+    return ess
+
+def reverse_each_pair(persistence_pairs_cob):
+    return [[pair[1],pair[0]] for pair in persistence_pairs_cob]
+
+def get_pivot_and_compressed_column (column_simplex, rows, birth_non_essential):
+    compressed_column = []
+    check_if_is_pivot = True
+
+    pivot = -1
+    
+    for row_index in range(len(rows)-1, -1, -1):
+        if is_coboundary(rows[row_index], column_simplex):
+            if check_if_is_pivot:
+                check_if_is_pivot = False
+                pivot = row_index
+                if pivot not in birth_non_essential:
+                    return pivot, []
+            compressed_column.append(row_index)
+        return pivot, compressed_column
+
+def get_compressed_column (column_simplex, rows):
+    compressed_column = []
+    for row_index in range(len(rows)-1, -1, -1):
+        if column_simplex[0] > rows[row_index][-1] or column_simplex[-1] < rows[row_index][0]:
+            continue
+
+        if is_coboundary(rows[row_index], column_simplex):
+            compressed_column.append(row_index)
+    return compressed_column
+
+def get_pivot_from_compressed_column (compressed_column):
+    if len(compressed_column) == 0:
+        return -1
+
+    possible_pivot = compressed_column[0]
+    i = 1
+    while i < len(compressed_column):
+        if possible_pivot == -1:
+            possible_pivot = compressed_column[i]
+
+        elif compressed_column[i] != possible_pivot:
+            return possible_pivot
+
+        else:
+            compressed_column.pop(0); compressed_column.pop(0)
+            i -= 2
+            possible_pivot = -1
+        
+        i += 1
+    return possible_pivot
+
+def sum_compressed_columns (compressed_column_1, compressed_column_2):
+    result_compressed_column = []
+    
+    index_column_1 = 0
+    index_column_2 = 0
+    while index_column_1 < len(compressed_column_1) and index_column_2 < len(compressed_column_2):
+        if compressed_column_1[index_column_1] >= compressed_column_2[index_column_2]:
+            result_compressed_column.append(compressed_column_1[index_column_1])
+            index_column_1 += 1
+
+        else:
+            result_compressed_column.append(compressed_column_2[index_column_2])
+            index_column_2 += 1
+
+    if index_column_1 < len(compressed_column_1):
+        result_compressed_column.extend(compressed_column_1[index_column_1:])
+    elif index_column_2 < len(compressed_column_2):
+        result_compressed_column.extend(compressed_column_2[index_column_2:])
+
+    return result_compressed_column
+
+def compute_reduced_column(columns, rows, V_col):
+    my_V_col = V_col.copy()
+    column_index = get_pivot_from_compressed_column(my_V_col)
+    if column_index == -1:
+        return []
+    
+    column_index = get_pivot_from_compressed_column(my_V_col)
+    reduced_column = get_compressed_column(columns[column_index], rows)
+
+    number_of_pivots = 1
+    column_index = get_pivot_from_compressed_column(my_V_col[number_of_pivots:])
+    while column_index != -1:
+        previously_sum_column = get_compressed_column(columns[column_index], rows)
+
+        reduced_column = sum_compressed_columns(reduced_column, previously_sum_column)
+
+        number_of_pivots +=1
+        column_index = get_pivot_from_compressed_column(my_V_col[number_of_pivots:])
+    return reduced_column
+
+def sum_columns_to_reduce (rows, columns, column_to_reduce, V_reduced_column):
+    working_column = column_to_reduce.copy()
+    reduced_column = compute_reduced_column(columns, rows, V_reduced_column)
+    working_column = sum_compressed_columns(working_column, reduced_column)
+    return working_column
+
+def create_compressed_V_matrix(number_of_columns):
+    return [[i] for i in range(number_of_columns)]
+
+def get_index_first_apparition (element, lista):
+    index = 0
+    while index < len(lista):
+        if element == lista[index]:
+            return index
+        index += 1
+    return -1
+
+def pHcol_Z2_ripser(rows, columns):
+    number_of_columns = len(columns)
+    
+    V_t = create_compressed_V_matrix(number_of_columns)
+    persistence_pairs = []
+    birth_non_essential = []
+    essential_indices = []
+
+    for column_index in range(number_of_columns):
+        pivot, compressed_column = get_pivot_and_compressed_column (
+            columns[column_index],
+            rows,
+            birth_non_essential
+        )
+
+        if pivot != -1 and len(compressed_column) == 0:
+            persistence_pairs.append([pivot, column_index])
+            birth_non_essential.append(pivot)
+
+        else :
+            birth_index = get_index_first_apparition(pivot, birth_non_essential)
+            while (
+                birth_index != -1 and pivot != -1
+            ):
+                reduced_column_index = persistence_pairs[birth_index][1]
+                compressed_column = sum_columns_to_reduce (
+                    rows, columns,
+                    compressed_column,
+                    V_t[reduced_column_index]
+                )
+
+            V_t[column_index] = sum_compressed_columns(
+                V_t[column_index],
+                V_t[reduced_column_index]
+            )
+
+            pivot = get_pivot_from_compressed_column (compressed_column)
+            birth_index = get_index_first_apparition(pivot, birth_non_essential)
+
+        if pivot != -1:
+            persistence_pairs.append([pivot, column_index])
+            birth_non_essential.append(pivot)
+        else:
+            essential_indices.append(column_index)
+    return V_t, persistence_pairs, essential_indices
+
+def get_pivots_sorted_from_pp (persistence_pairs):
+    sorted_pivots = []
+    for pair in persistence_pairs:
+        bisect.insort(sorted_pivots, pair[0])
+    return sorted_pivots
+
+def clearing_columns_ripser (rows, columns, dp1_persistence_pairs):
+    pivots = get_pivots_sorted_from_pp(dp1_persistence_pairs)
+    columns_cleared = remove_elements_with_indices (columns, pivots)
+
+    d_V_t_cleared, d_persistence_pairs, d_essential_indices = pHcol_Z2_ripser(rows, columns_cleared)
+    d_persistence_pairs = fix_pp_column_indices(d_persistence_pairs, pivots)
+    d_essential_indices = fix_ess_column_indices(d_essential_indices, pivots)
+    return d_persistence_pairs, d_essential_indices
+
+def ripser(simplicial_complex):
+    simplexwise_filtration = copy.deepcopy(simplicial_complex[1])
+
+    filtration_by_dimension = divide_by_dimension(simplexwise_filtration)
+
+    total_simplices = len(simplexwise_filtration)
+    number_of_dimensions = len(filtration_by_dimension)
+    number_of_vertices = len(get_vertices(simplicial_complex))
+
+    persistence_pairs = []
+    essential_indices = []
+    dp1_pp = []
+
+    for rows_dimension in range(1, number_of_dimensions):
+        rows = copy.deepcopy(filtration_by_dimension[rows_dimension])
+        number_of_rows = len(rows)
+
+        columns = copy.deepcopy(filtration_by_dimension[rows_dimension-1])
+        number_of_columns = len(columns)
+
+        # Para la correcta computación de la coboundary
+        rows.reverse()
+        columns.reverse()
+
+        d_pp, d_ess = clearing_columns_ripser(rows, columns, dp1_pp)
+        d_persistence_pairs_cob = reverse_pairs_indices(number_of_rows -1, number_of_columns -1 , d_pp)
+        d_essential_indices_cob = reverse_essential_indices(number_of_columns-1, d_ess)
+
+        start_column_index, start_row_index = get_row_and_column_indices(filtration_by_dimension, rows_dimension)
+
+        # Los pares de persistencia tienen que darse la vuelta
+        d_persistence_pairs_cob = fix_pp(d_persistence_pairs_cob, start_row_index, start_column_index)
+
+        d_persistence_pairs = reverse_each_pair(d_persistence_pairs_cob)
+        persistence_pairs.extend(
+            d_persistence_pairs
+        )
+
+        essential_indices.extend(
+            fix_ess (d_essential_indices_cob, start_column_index)
+        )
+        
+        dp1_pp = d_pp
+
+        # Rellenar los essential_indices que son todos los de mayor dimensión excepto los death
+        birth_non_essential = [pair[1] for pair in d_persistence_pairs]
+        for i in range(len(filtration_by_dimension[-1])):
+            simplex_index = i + start_row_index
+            if simplex_index not in birth_non_essential: essential_indices.append(simplex_index)
+    
+    return persistence_pairs, essential_indices
+
+
+#Comparacion de Algoritmos
+
+from scipy.spatial import distance_matrix
+import bisect
+
+
+def sort_by_diameter_and_index (chain_simplex, distance_m):
+    def sorter (simplex):
+        return (simplex_diameter (simplex, distance_m), simplex)
+    
+    return sorted(chain_simplex, key=sorter)
+
+def is_valid_simplex(simplex, v, threshold, distance_m):
+    for index in simplex:
+        if distance_m[index][v] > threshold:
+            return False
+    return True
+
+def add_next_dimension_simplices (last_sf, threshold, distance_m):
+    d_simplexwise_filtration = []
+    for v in range(len(distance_m)):
+        for index in range(len(last_sf)):
+            simplex = last_sf[index]
+            if (
+                v not in simplex and
+                is_valid_simplex(simplex, v, threshold, distance_m)
+            ):
+                new_simplex = last_sf[index].copy()
+                if (
+                    v not in simplex and
+                    is_valid_simplex(simplex, v, threshold, distance_m)
+                ):
+                    new_simplex = last_sf[index].copy()
+                    bisect.insort(new_simplex, v)
+
+                    if new_simplex not in d_simplexwise_filtration:
+                        d_simplexwise_filtration.append(new_simplex)
+    return d_simplexwise_filtration
+
+def create_rips_simplexwise_filtration(vertices, threshold, max_dimension, distance_m):
+    simplexwise_filtration = [[i] for i in range(len(vertices))]
+    
+    last_simplexwise_filtration = copy.deepcopy(simplexwise_filtration)
+    for _ in range(1, max_dimension):
+        d_simplexwise_filtration =add_next_dimension_simplices(last_simplexwise_filtration, threshold, distance_m)
+        
+        if len(d_simplexwise_filtration) == 0:
+            break
+
+        d_simplexwise_filtration = sort_by_diameter_and_index(d_simplexwise_filtration, distance_m)
+        last_simplexwise_filtration = copy.deepcopy(d_simplexwise_filtration)
+        simplexwise_filtration.extend(copy.deepcopy(d_simplexwise_filtration))
+    return simplexwise_filtration
+
+from time import time
+
+#69 -> page 76
